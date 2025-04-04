@@ -13,18 +13,34 @@ const server = http.createServer(app);
 
 // Enhanced CORS configuration
 const corsOptions = {
-  origin: config.server.allowedOrigins,
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization'],
-  credentials: true
+    origin: function (origin, callback) {
+        // Allow requests with no origin (like mobile apps or curl requests)
+        if (!origin) return callback(null, true);
+        
+        // Check if the origin is in the allowed list
+        if (config.server.allowedOrigins.includes(origin)) {
+            callback(null, true);
+        } else {
+            // Check if the origin is a local network IP
+            const isLocalNetwork = /^(http|https):\/\/(192\.168\.|10\.0\.0\.|172\.(1[6-9]|2[0-9]|3[0-1])\.)/.test(origin);
+            if (isLocalNetwork) {
+                callback(null, true);
+            } else {
+                callback(new Error('Not allowed by CORS'));
+            }
+        }
+    },
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization'],
+    credentials: true
 };
 
 app.use(cors(corsOptions));
 app.use(express.json());
 
 const io = socketIo(server, {
-  cors: corsOptions,
-  transports: ['websocket', 'polling']
+    cors: corsOptions,
+    transports: ['websocket', 'polling']
 });
 
 // Ensure upload and temp directories exist

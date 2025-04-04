@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import io from 'socket.io-client';
 import axios from 'axios';
+import config from './config';
 import './App.css';
 
 function App() {
@@ -15,7 +16,7 @@ function App() {
 
   useEffect(() => {
     // Initialize socket connection
-    const newSocket = io('http://localhost:5000', {
+    const newSocket = io(config.api.baseUrl, {
       reconnection: true,
       reconnectionAttempts: 5,
       timeout: 10000
@@ -55,7 +56,7 @@ function App() {
     // Get initial network info
     const fetchNetworkInfo = async () => {
       try {
-        const response = await axios.get('http://localhost:5000/network-info');
+        const response = await axios.get(`${config.api.baseUrl}/network-info`);
         setNetworkInfo(response.data);
       } catch (err) {
         setError('Failed to fetch network information');
@@ -99,7 +100,7 @@ function App() {
 
     try {
       setUploadProgress(0);
-      const response = await axios.post('http://localhost:5000/upload', formData, {
+      const response = await axios.post(`${config.api.baseUrl}/upload`, formData, {
         onUploadProgress: (progressEvent) => {
           const progress = Math.round((progressEvent.loaded * 100) / progressEvent.total);
           setUploadProgress(progress);
@@ -107,7 +108,7 @@ function App() {
       });
       setSelectedFiles(null);
       setError(null);
-      handleRefresh(); // Refresh files list after upload
+      handleRefresh();
     } catch (err) {
       setError('Failed to upload files');
     }
@@ -120,7 +121,7 @@ function App() {
     }
 
     try {
-      const response = await axios.get(`http://localhost:5000/download/${filename}`, {
+      const response = await axios.get(`${config.api.baseUrl}/download/${filename}`, {
         responseType: 'blob'
       });
       const url = window.URL.createObjectURL(new Blob([response.data]));

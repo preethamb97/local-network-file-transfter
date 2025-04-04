@@ -6,13 +6,14 @@ const multer = require('multer');
 const path = require('path');
 const fs = require('fs-extra');
 const os = require('os');
+const config = require('./config');
 
 const app = express();
 const server = http.createServer(app);
 
 // Enhanced CORS configuration
 const corsOptions = {
-  origin: '*',
+  origin: config.server.allowedOrigins,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization'],
   credentials: true
@@ -26,24 +27,26 @@ const io = socketIo(server, {
   transports: ['websocket', 'polling']
 });
 
-// Default upload directory
-const defaultUploadDir = path.join(__dirname, 'uploads');
-fs.ensureDirSync(defaultUploadDir);
-
-// Current upload directory
-let currentUploadDir = defaultUploadDir;
+// Ensure upload and temp directories exist
+fs.ensureDirSync(config.fileTransfer.uploadFolder);
+fs.ensureDirSync(config.fileTransfer.tempFolder);
 
 // Configure multer for file uploads
 const storage = multer.diskStorage({
   destination: (req, file, cb) => {
-    cb(null, currentUploadDir);
+    cb(null, config.fileTransfer.uploadFolder);
   },
   filename: (req, file, cb) => {
     cb(null, Date.now() + '-' + file.originalname);
   }
 });
 
-const upload = multer({ storage });
+const upload = multer({ 
+  storage,
+  limits: {
+    fileSize: config.fileTransfer.maxFileSize
+  }
+});
 
 // Socket.IO connection handling
 io.on('connection', (socket) => {
@@ -54,7 +57,7 @@ io.on('connection', (socket) => {
   });
 
   socket.on('request-files', () => {
-    fs.readdir(currentUploadDir, (err, files) => {
+    fs.readdir(config.fileTransfer.uploadFolder, (err, files) => {
       if (err) {
         socket.emit('error', 'Error reading directory');
         return;
@@ -74,7 +77,7 @@ app.post('/set-upload-dir', (req, res) => {
   try {
     const absolutePath = path.resolve(directory);
     fs.ensureDirSync(absolutePath);
-    currentUploadDir = absolutePath;
+    config.fileTransfer.uploadFolder = absolutePath;
     res.json({ message: 'Upload directory set successfully', path: absolutePath });
   } catch (error) {
     res.status(500).json({ error: 'Failed to set upload directory' });
@@ -83,7 +86,7 @@ app.post('/set-upload-dir', (req, res) => {
 
 // Get current upload directory
 app.get('/current-upload-dir', (req, res) => {
-  res.json({ path: currentUploadDir });
+  res.json({ path: config.fileTransfer.uploadFolder });
 });
 
 // File upload endpoint
@@ -93,13 +96,13 @@ app.post('/upload', upload.array('files'), (req, res) => {
 
 // File download endpoint
 app.get('/download/:filename', (req, res) => {
-  const file = path.join(currentUploadDir, req.params.filename);
+  const file = path.join(config.fileTransfer.uploadFolder, req.params.filename);
   res.download(file);
 });
 
 // Get list of available files
 app.get('/files', (req, res) => {
-  fs.readdir(currentUploadDir, (err, files) => {
+  fs.readdir(config.fileTransfer.uploadFolder, (err, files) => {
     if (err) {
       return res.status(500).json({ error: 'Error reading directory' });
     }
@@ -123,16 +126,26 @@ app.get('/network-info', (req, res) => {
     });
   });
   
-  res.json({ addresses });
+  res.json({ 
+    addresses,
+    customIp: config.network.customIp,
+    customPort: config.network.customPort
+  });
 });
 
-const PORT = process.env.PORT || 5000;
-const HOST = '0.0.0.0';
+// Start server
+const PORT = config.server.port;
+const HOST = config.server.host;
 
 server.listen(PORT, HOST, () => {
   console.log(`Server running on:`);
   console.log(`- Local: http://localhost:${PORT}`);
-  console.log(`- Default upload directory: ${defaultUploadDir}`);
+  console.log(`- Default upload directory: ${config.fileTransfer.uploadFolder}`);
+  
+  if (config.network.customIp) {
+    console.log(`- Custom IP: ${config.network.customIp}:${config.network.customPort || PORT}`);
+  }
+  
   const networkInterfaces = os.networkInterfaces();
   Object.keys(networkInterfaces).forEach((interfaceName) => {
     networkInterfaces[interfaceName].forEach((interface) => {

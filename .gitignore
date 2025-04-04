@@ -70,3 +70,4 @@ var/
 *.egg-info/
 .installed.cfg
 *.egg 
+uploads/

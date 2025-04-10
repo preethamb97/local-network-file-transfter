@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import io from 'socket.io-client';
 import axios from 'axios';
 import config from './config';
+import SharedClipboard from './components/SharedClipboard';
 import './App.css';
 
 function App() {
@@ -161,6 +162,8 @@ function App() {
       </header>
 
       <main>
+        <SharedClipboard />
+        
         <div className="upload-section">
           <h2>Upload Files</h2>
           <input

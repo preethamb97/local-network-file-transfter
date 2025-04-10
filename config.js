@@ -12,20 +12,18 @@ function getLocalIP() {
             }
         }
     }
-    return 'localhost';
+    return '192.168.31.153'; // Fallback to your specific IP
 }
 
 const localIP = getLocalIP();
 
 // Function to generate allowed origins for local network
 function getAllowedOrigins() {
-    const origins = ['http://localhost:3000'];
-    // Add all possible local network IPs
-    for (let i = 1; i <= 255; i++) {
-        origins.push(`http://192.168.1.${i}:3000`);
-        origins.push(`http://192.168.0.${i}:3000`);
-        origins.push(`http://10.0.0.${i}:3000`);
-    }
+    const origins = [
+        'http://localhost:3000',
+        `http://${localIP}:3000`,
+        'http://192.168.31.153:3000'  // Your specific IP
+    ];
     return origins;
 }
 

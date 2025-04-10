@@ -64,23 +64,71 @@ const upload = multer({
   }
 });
 
+// Clipboard data store
+const clipboardStore = {
+    data: null,
+    type: null,
+    timestamp: null
+};
+
 // Socket.IO connection handling
 io.on('connection', (socket) => {
-  console.log('New client connected from:', socket.handshake.address);
+    console.log('New client connected from:', socket.handshake.address);
 
-  socket.on('disconnect', () => {
-    console.log('Client disconnected');
-  });
+    // Send current clipboard data to new client
+    if (clipboardStore.data) {
+        socket.emit('clipboard-update', {
+            data: clipboardStore.data,
+            type: clipboardStore.type,
+            timestamp: clipboardStore.timestamp
+        });
+    }
 
-  socket.on('request-files', () => {
-    fs.readdir(config.fileTransfer.uploadFolder, (err, files) => {
-      if (err) {
-        socket.emit('error', 'Error reading directory');
-        return;
-      }
-      socket.emit('files-list', files);
+    socket.on('disconnect', () => {
+        console.log('Client disconnected');
     });
-  });
+
+    // Handle clipboard updates
+    socket.on('clipboard-update', (data) => {
+        // Validate data size (20MB limit)
+        if (data.data && data.data.length > 20 * 1024 * 1024) {
+            socket.emit('error', 'Clipboard data exceeds 20MB limit');
+            return;
+        }
+
+        // Update clipboard store
+        clipboardStore.data = data.data;
+        clipboardStore.type = data.type;
+        clipboardStore.timestamp = Date.now();
+
+        // Broadcast to all other clients
+        socket.broadcast.emit('clipboard-update', {
+            data: data.data,
+            type: data.type,
+            timestamp: clipboardStore.timestamp
+        });
+    });
+
+    // Handle clipboard request
+    socket.on('request-clipboard', () => {
+        if (clipboardStore.data) {
+            socket.emit('clipboard-update', {
+                data: clipboardStore.data,
+                type: clipboardStore.type,
+                timestamp: clipboardStore.timestamp
+            });
+        }
+    });
+
+    socket.on('request-files', () => {
+      fs.readdir(config.fileTransfer.uploadFolder, (err, files) => {
+        if (err) {
+          socket.emit('error', 'Error reading directory');
+          return;
+        }
+        socket.emit('files-list', files);
+      });
+    });
 });
 
 // Set upload directory endpoint
